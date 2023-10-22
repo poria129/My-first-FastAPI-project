@@ -9,7 +9,7 @@ from .models import User
 from .utils import hash_password, verify_password
 
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 SECRET_KEY = "my-32-character-ultra-secret-123"
 ALGORITHM = "HS256"
@@ -33,10 +33,10 @@ def list_serializer(users) -> list:
     return [single_serializer(user) for user in users]
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
-@router.post("/auth")
+@router.post("/")
 async def create_user(create_user_request: User):
     existing_user_email = user_collection.find_one({"email": create_user_request.email})
     if existing_user_email:
@@ -61,17 +61,17 @@ async def create_user(create_user_request: User):
     user_collection.insert_one(dict(create_user_model))
 
 
-@router.get("/auth")
+@router.get("/")
 async def get_users():
     return list_serializer(user_collection.find())
 
 
-@router.put("/auth/{id}")
+@router.put("/{id}")
 async def update_user(id: str, user: User):
     user_collection.find_one_and_update({"_id": ObjectId(id)}, {"$set": dict(user)})
 
 
-@router.delete("/auth/{id}")
+@router.delete("/{id}")
 async def delete_user(id: str, token: str = Depends(oauth2_scheme)):
     user_collection.find_one_and_delete({"_id": ObjectId(id)})
 
