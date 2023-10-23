@@ -1,6 +1,14 @@
 from pymongo import MongoClient
 
-client = MongoClient("mongodb://localhost:27017/")
-db = client["todo_app"]
-todo_collection = db["todos"]
-user_collection = db["users"]
+MONGODB_URI = "mongodb://localhost:27017"
+MONGODB_DATABASE = "todo_app"
+
+client = MongoClient(MONGODB_URI)
+db = client[MONGODB_DATABASE]
+
+
+def get_db():
+    try:
+        yield db
+    finally:
+        client.close()

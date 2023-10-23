@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import jwt
 
-from .db import user_collection
+from .db import get_db
 from .models import User
 from .utils import hash_password, verify_password
 
@@ -37,7 +37,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 @router.post("/")
-async def create_user(create_user_request: User):
+async def create_user(create_user_request: User, db: dict = Depends(get_db)):
+    user_collection = db["users"]
     existing_user_email = user_collection.find_one({"email": create_user_request.email})
     if existing_user_email:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -62,17 +63,22 @@ async def create_user(create_user_request: User):
 
 
 @router.get("/")
-async def get_users():
+async def get_users(db: dict = Depends(get_db)):
+    user_collection = db["users"]
     return list_serializer(user_collection.find())
 
 
 @router.put("/{id}")
-async def update_user(id: str, user: User):
+async def update_user(id: str, user: User, db: dict = Depends(get_db)):
+    user_collection = db["users"]
     user_collection.find_one_and_update({"_id": ObjectId(id)}, {"$set": dict(user)})
 
 
 @router.delete("/{id}")
-async def delete_user(id: str, token: str = Depends(oauth2_scheme)):
+async def delete_user(
+    id: str, token: str = Depends(oauth2_scheme), db: dict = Depends(get_db)
+):
+    user_collection = db["users"]
     user_collection.find_one_and_delete({"_id": ObjectId(id)})
 
 
@@ -88,7 +94,10 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 
 
 @router.post("/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: dict = Depends(get_db)
+):
+    user_collection = db["users"]
     user = user_collection.find_one({"username": form_data.username})
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
