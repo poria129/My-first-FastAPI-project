@@ -2,6 +2,7 @@ from pymongo import MongoClient
 
 
 class MongoDBConnection:
+    __slots__ =
     def __init__(self, host, port, database_name):
         self.host = host
         self.port = port
@@ -28,6 +29,8 @@ def get_user_collection():
         return db["users"]
 
 
-# Usage example:
+
 todo_collection = get_todo_collection()
 user_collection = get_user_collection()
+
+
