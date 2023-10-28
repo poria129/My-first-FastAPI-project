@@ -1,7 +1,5 @@
-from dataclasses import field
-from enum import unique
 from bson import ObjectId
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class User(BaseModel):
@@ -18,12 +16,12 @@ class ToDo(BaseModel):
     name: str
     description: str
     complete: bool
+    username: str
 
     class config:
         allow_population_by_field_name = True
         json_encoders = {ObjectId: str}
 
 
-# class UserLogin(BaseModel):
-#     username: str
-#     password: str
+class ToDoCreate(ToDo):
+    username: str = Field(..., read_only=True)
