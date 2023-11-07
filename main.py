@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app import auth, todo
+from app.routs import auth, todo
 
 
 app = FastAPI()

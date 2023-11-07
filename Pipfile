@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 fastapi = {extras = ["all"], version = "*"}
-uvicorn = {extras = ["standard"], version = "*"}
+uvicorn = "*"
 pymongo = "==3.11"
 pymango = "*"
 python-jose = "*"

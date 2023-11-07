@@ -3,13 +3,12 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWSError, jwt
-from pydantic import EmailStr
 from starlette import status
 from typing import Annotated
 
-from .db import MongoDBManager
-from .models import User
-from .utils import hash_password, verify_password, pwd_context
+from app.db import MongoDBManager
+from app.models import User
+from app.utils import hash_password, verify_password
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -32,24 +31,37 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return encoded_jwt
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        email: EmailStr = payload.get("email")
-        if username is None or email is None:
+        id: str = payload.get("id")
+        if username is None or id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate"
             )
-        return {"username": username, "email": email}
+        return {"username": username, "id": id}
     except JWSError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate"
         )
 
 
-with MongoDBManager() as db:
-    user_collection = db.users
+def get_collection():
+    with MongoDBManager() as db_manager:
+        user_collection = db_manager.users
+        return user_collection
+
+
+# def get_collection(db_manager):
+#     with db_manager:
+#         user_collection = db_manager.users
+#         return user_collection
+
+
+# if __name__ == "__main__":
+#     db_manager = MongoDBManager()
+#     user_collection = get_collection(db_manager)
 
 
 def single_serializer(user) -> dict:
@@ -71,11 +83,13 @@ def list_serializer(users) -> list:
 
 @router.post("/")
 async def create_user(create_user_request: User):
-    existing_user_email = user_collection.find_one({"email": create_user_request.email})
+    existing_user_email = get_collection().find_one(
+        {"email": create_user_request.email}
+    )
     if existing_user_email:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    existing_user_username = user_collection.find_one(
+    existing_user_username = get_collection().find_one(
         {"username": create_user_request.username}
     )
     if existing_user_username:
@@ -91,27 +105,27 @@ async def create_user(create_user_request: User):
         role=create_user_request.role,
     )
 
-    user_collection.insert_one(dict(create_user_model))
+    get_collection().insert_one(dict(create_user_model))
 
 
 @router.get("/")
 def get_users():
-    return list_serializer(user_collection.find())
+    return list_serializer(get_collection().find())
 
 
 @router.put("/{id}")
 def update_user(id: str, user: User):
-    user_collection.find_one_and_update({"_id": ObjectId(id)}, {"$set": dict(user)})
+    get_collection().find_one_and_update({"_id": ObjectId(id)}, {"$set": dict(user)})
 
 
 @router.delete("/{id}")
 def delete_user(id: str, token: str = Depends(oauth2_scheme)):
-    user_collection.find_one_and_delete({"_id": ObjectId(id)})
+    get_collection().find_one_and_delete({"_id": ObjectId(id)})
 
 
 @router.post("/token")
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = user_collection.find_one({"username": form_data.username})
+    user = get_collection().find_one({"username": form_data.username})
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     if not verify_password(form_data.password, user["hashed_password"]):
@@ -119,7 +133,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["username"], "email": user["email"]},
+        data={"sub": user["username"], "id": str(user["_id"])},
         expires_delta=access_token_expires,
     )
     return {"access_token": access_token, "token_type": "bearer"}
